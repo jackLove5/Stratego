@@ -3,13 +3,12 @@ from board import *
 from board_configuration import *
 from bot import *
 
-
 class Game:
   """
   Extract coordinate pair from raw string
   return empty list if invalid input
   """
-  def get_coord_pair(string):
+  def get_coord_pair(self, string):
     string = "".join(string.split())
     string = string.upper()
     if (len(string) != 4):
@@ -35,16 +34,21 @@ class Game:
     player_setup = BoardConfiguration(player_config)
 
     self._game_board = Board(bot_setup, player_setup)
-
     self._game_board_state = self._game_board.to_json("blue", "swap pieces")
+
+    self._in_setup_state = True
+    self._completed = False
+
+  def begin_play(self):
+    self._in_setup_state = False
 
   def get_board_state(self):
     return self._game_board_state
 
-  def process_move(self, coord_pair, setup_state):
+  def process_move(self, coord_pair):
     game_board = self._game_board
     message = ""
-    if (setup_state):
+    if (self._in_setup_state):
       print('processing swap in game.py')
     
       if (coord_pair != [] and game_board.has_player_piece(coord_pair[0]) 
@@ -73,4 +77,8 @@ class Game:
     return self._game_board_state
 
   def has_winner(self):
-    return self._game_board.has_win()
+    if (self._completed):
+      return True
+    else:
+      self._completed = self._game_board.has_win()
+      return self._completed

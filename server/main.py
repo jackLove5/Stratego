@@ -22,51 +22,35 @@ async def style(request):
   with open('../styles.css') as f:
     return web.Response(text=f.read(), content_type='text/css')
 
-swapping = False
-initialized = False
-winner = False
-game = None
+sid_to_game = {}
 
 # front end emits "message" event
 @sio.on('receive_move')
-async def make_move(sid, str):
-  global initialized
-  global swapping
-  global winner
-  global game
+async def make_move(sid, string):
+  global sid_to_game
 
-  print('received move ' + str)
-  if initialized and not winner:
-    coord_pair = Game.get_coord_pair(str)
-    board_state = game.process_move(coord_pair, swapping)
-    if (game.has_winner()):
-      winner = True
+  game = None if sid not in sid_to_game else sid_to_game[sid]
+  if game is not None and not game.has_winner():
+    coord_pair = game.get_coord_pair(string)
+    board_state = game.process_move(coord_pair)
 
-    await sio.emit('boardUpdate', board_state)
-    print('emmited board')
+    await sio.emit('boardUpdate', board_state, sid)
 
 @sio.on('start_game')
 async def start_game(sid):
-  global swapping
-  print('starting game')
-  swapping = False
+  game = None if sid not in sid_to_game else sid_to_game[sid]
+  if game is not None:
+    game.begin_play()
 
 @sio.on('connection')
 async def init_game(sid):
-  global initialized
-  global swapping
-  global winner
-  global game
+  global sid_to_game
 
   print('connection from ' + sid)
-  game = Game()
-  board_state = game.get_board_state()
+  sid_to_game[sid] = Game()
+  board_state = sid_to_game[sid].get_board_state()
 
-  await sio.emit('boardUpdate', board_state)
-
-  initialized = True
-  swapping = True
-  winner = False
+  await sio.emit('boardUpdate', board_state, sid)
 
 app.router.add_get('/', index)
 app.router.add_get('/jquery-3.5.1.min.js', jquery)
