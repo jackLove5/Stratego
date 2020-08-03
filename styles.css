@@ -1,22 +1,16 @@
-/* TODO: make not fixed */
-#Board {
-  position: relative;
-  top: 20px;
-  left: 60px;
-  width: 600px;
-  height: 600px;
-  border-style: solid;
-  border-width: 2px;
+#board {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  box-sizing: border-box;
+  width: 40%;
 }
 
-.Piece {
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  border: 1px dashed black;
+.square {
+  box-sizing: border-box;
+  border: 1px solid black;
   text-align: center;
-  vertical-align: center;
-  line-height: 60px;
+  font-size: 1rem;
 }
 
 .Blue {
@@ -30,37 +24,29 @@
   color: #ff0000;
 }
 
-.Black {
-  color: #000000;
-}
-
-.Select {
+.select {
   background-color:#666666;
 }
 
-.UnSelect {
-  background-color:#ffffff;
-}
+.row0 {}
+.row1 {}
+.row2 {}
+.row3 {}
+.row4 {}
+.row5 {}
+.row6 {}
+.row7 {}
+.row8 {}
+.row9 {}
 
-.row1 { top:0px; }
-.row2 { top:60px; }
-.row3 { top:120px; }
-.row4 { top:180px; }
-.row5 { top:240px; }
-.row6 { top:300px; }
-.row7 { top:360px; }
-.row8 { top:420px; }
-.row9 { top:480px; }
-.row10 { top:540px; }
-
-.col1 { left: 0px; }
-.col2 { left: 60px; }
-.col3 { left: 120px; }
-.col4 { left: 180px; }
-.col5 { left: 240px; }
-.col6 { left: 300px; }
-.col7 { left: 360px; }
-.col8 { left: 420px; }
-.col9 { left: 480px; }
-.col10 { left: 540px; }
+.col0 {}
+.col1 {}
+.col2 {}
+.col3 {}
+.col4 {}
+.col5 {}
+.col6 {}
+.col7 {}
+.col8 {}
+.col9 {}
 
