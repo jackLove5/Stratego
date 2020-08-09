@@ -15,8 +15,6 @@ def get_piece_from_rank(rank, team):
 
   return ret
 
-# coordinates of the lake; out of bounds
-
 """
 Gameboard class. Hold pieces, validates moves, carries out moves, and
 determines winner
@@ -69,7 +67,7 @@ class Board:
 
     print('  ABCDEFGHIJ')
   
-  def to_json(self, turn, message):
+  def to_json(self, turn, messages):
     json = '{"board": '
     board = self._board
     json += '['
@@ -90,11 +88,16 @@ class Board:
       json += (']' if i == len(board) - 1 else ',')
 
     if (self.has_win()):
-      message += '\\n' + self.get_winner() + ' wins!';
+      messages.append(self.get_winner() + ' wins!')
 
     json +=  ',"Turn": "' + turn + '"'
-    json += ',"Message": "' + message + '"'
-    json += '}'
+    json += ',"messages": ['
+    for i in range(len(messages)):
+      json += '"' + messages[i] + '"'
+      if i < len(messages) - 1:
+        json += ','
+    
+    json += ']}'
     return json
 
   """
@@ -196,10 +199,10 @@ class Board:
 
     src_obj.set_has_moved()
     board[src_y][src_x] = None
+    messages = []
     if (dst_obj is None):
       # Moved to empty space
       board[dst_y][dst_x] = src_obj
-      return ''
     else:
       # Moved to enemy space
     
@@ -220,17 +223,17 @@ class Board:
         src_dead = True
         dst_dead = True
 
-      ret = ''
       if (src_dead):
-        ret += (src_obj.get_team() + "'s " + src_obj.get_name() + 
+        string = (src_obj.get_team() + "'s " + src_obj.get_name() + 
           " removed by " + dst_obj.get_team() + "'s " + dst_obj.get_name())
+        messages.append(string)
 
       if (dst_dead):
-        if ret != '':
-          ret = ret + '\\n'
-        ret = ret + dst_obj.get_team() + "\'s " + dst_obj.get_name() + ' removed by ' + \
+        string = dst_obj.get_team() + "\'s " + dst_obj.get_name() + ' removed by ' + \
           src_obj.get_team() + "\'s " + src_obj.get_name()
-      return ret
+        messages.append(string)
+
+    return messages
 
   # checks win consition. Return true iff there's a winner
   def has_win(self):

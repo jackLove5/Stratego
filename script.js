@@ -1,7 +1,4 @@
 var gameBoard = {};
-gameBoard.size = 10;
-gameBoard.pieces = new Array(gameBoard.size);
-gameBoard.selected = {};
 
 function initBoard() {
   for (var i = 0; i < gameBoard.size; i++) {
@@ -38,72 +35,134 @@ function updateSquares() {
   }
 }
 
-function setSelected(row, col) {
-  $('.square').each( function(index) {
-    var width = $(this).width();
-    var height = $(this).height();
-    if (row == Math.floor($(this).position().top / height) && col == Math.floor($(this).position().left / width)) {
-      $(this).addClass('select');
-    }
-  });
-}
-
-function deselect() {
-  $('.square').each(function(index) {
-    $(this).removeClass('select');
-  });
-}
-
-$(document).on('click', '.square', function(e) {
-  var boardPosition = $('#board').position();
-  var squareWidth = $('#board').width() / gameBoard.size;
-  var squareHeight = $('#board').height() / gameBoard.size;
-
-  var row = Math.floor((e.pageY - boardPosition.top) / squareHeight);
-  var col = Math.floor((e.pageX - boardPosition.left) / squareWidth);
-
-  var squareObj = gameBoard.pieces[row][col];
-  if (jQuery.isEmptyObject(gameBoard.selected)) {
-    if (('team' in squareObj) && squareObj.team == 'Blue'){
-      setSelected(row, col);
-      gameBoard.selected = {row: row, col: col};
-    }
-  }
-  else {
-    var dst = {row: row, col: col};
-    deselect();
-    sendMsg(gameBoard.selected, dst);
-    gameBoard.selected = {};
-  }
-});
-
-const socket = io("http://localhost:8080");
-socket.on("boardUpdate", function(data) {
-  var obj = JSON.parse(data);
-  gameBoard.pieces = obj.board;
-  updateSquares();
-  $('#msgbox').val(obj.Message);
-});
-
-function sendMsg(src, dst) {
+function sendMove(src, dst) {
   var boardStr = src.row.toString() + src.col.toString() + dst.row.toString() + dst.col.toString();
   socket.emit("receive_move", boardStr);
 }
 
 function startGame() {
   socket.emit("start_game");
+  $('#start-button').hide();
 }
 
-function setBoardWidth() {
+function sendChat() { 
+  var msg = $('#message-text').val();
+  $('#message-text').val('');
+
+  var msgDiv = '<div class="message-item">' + msg + '</div>';
+  $('#message-box').append(msgDiv);
+  socket.emit('receive_msg', msg);
+}
+
+function setDivHeights() {
   var boardWidth = $('#board').width();
+
   $('#board').css({
+    'height': boardWidth + 'px'
+  });
+
+  $('#chat').css({
     'height': boardWidth + 'px'
   });
 }
 
-window.addEventListener('resize', setBoardWidth);
+function centerSquareText() {
+  var squareHeight = $('.square').height();
+  $('.square').css({
+    'line-height': squareHeight + 'px'
+  });
+}
 
-setBoardWidth();
-initBoard();
-initSquares();
-socket.emit("connection");
+
+function initGame() {
+  gameBoard.size = 10;
+  gameBoard.pieces = new Array(gameBoard.size);
+  gameBoard.selected = {};
+  gameBoard.gameOver = false
+  $('#start-button').off('click').click(startGame);
+  $('#start-button').text('Start game');
+  $('#start-button').show();
+
+  $('#board').empty();
+  $('#message-box').empty();
+  initBoard();
+  initSquares();
+  centerSquareText();
+  socket.emit("connection");
+}
+
+const socket = io("http://localhost:8080");
+
+socket.on("boardUpdate", function(data) {
+  var obj = JSON.parse(data);
+  gameBoard.pieces = obj.board;
+  updateSquares();
+
+  var messages = obj.messages;
+  for (var i = 0; i < messages.length; i++) {
+    var msgDiv = '<div class="message-item">' + messages[i] + '</div>';
+    $('#message-box').append(msgDiv);
+  }
+
+});
+
+socket.on("gameOver", function() {
+  gameBoard.gameOver = true;
+  $('#message-box').append('Click the button to play again');
+  $('#start-button').text('New game');
+  $('#start-button').off('click').click(initGame);
+  $('#start-button').show();
+});
+
+window.addEventListener('resize', function() {
+  setDivHeights();
+  centerSquareText();
+});
+
+$(document).keyup(function(e) {
+  if ($('#message-text').is(':focus') && $('#message-text').val !== ''
+    && e.key == 'Enter') {
+    sendChat();
+  }
+});
+
+$(document).on('click', '.square', function(e) {
+
+  if (gameBoard.gameOver) {
+    return
+  }
+
+  var classList = $(e.target).attr('class').split(/\s+/);
+  var row;
+  var col;
+
+  for (var i = 0; i < classList.length; i++) {
+    if (classList[i].search('row') !== -1) {
+      row = parseInt(classList[i][3]);
+    }
+    else if (classList[i].search('col') !== -1) {
+      col = parseInt(classList[i][3]);
+    }
+  }
+
+  var squareObj = gameBoard.pieces[row][col];
+  if (jQuery.isEmptyObject(gameBoard.selected)) {
+    if (('team' in squareObj) && squareObj.team == 'Blue'){
+      $(e.target).addClass('select');
+      gameBoard.selected = {row: row, col: col};
+    }
+  }
+  else {
+    var dst = {row: row, col: col};
+    $('.square').each(function(index) {
+      $(this).removeClass('select');
+    });
+     
+    sendMove(gameBoard.selected, dst);
+    gameBoard.selected = {};
+  }
+});
+
+setDivHeights();
+initGame();
+

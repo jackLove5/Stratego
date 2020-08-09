@@ -34,7 +34,7 @@ class Game:
     player_setup = BoardConfiguration(player_config)
 
     self._game_board = Board(bot_setup, player_setup)
-    self._game_board_state = self._game_board.to_json("blue", "swap pieces")
+    self._game_board_state = self._game_board.to_json("blue", ["Swap pieces then click the button to start the game"])
 
     self._in_setup_state = True
     self._completed = False
@@ -47,33 +47,25 @@ class Game:
 
   def process_move(self, coord_pair):
     game_board = self._game_board
-    message = ""
-    if (self._in_setup_state):
-      print('processing swap in game.py')
-    
+    messages = []
+    if (self._in_setup_state): 
       if (coord_pair != [] and game_board.has_player_piece(coord_pair[0]) 
-        and game_board.has_player_piece(coord_pair[1])):
-   
-        game_board.swap_pieces(coord_pair[0], coord_pair[1])
-      else:
-        message = "invalid swap"
+        and game_board.has_player_piece(coord_pair[1])): 
 
+        game_board.swap_pieces(coord_pair[0], coord_pair[1])
     elif (game_board.validate_move(coord_pair[0], coord_pair[1],
       Constants.PLAYER_NAME)):
     
-      move_res = game_board.do_move(coord_pair[0], coord_pair[1])
-      message = move_res
-    
+      messages = game_board.do_move(coord_pair[0], coord_pair[1])
+ 
       if (not game_board.has_win()):
         bot_move = self._bot.get_move(game_board)
-        moveRes = game_board.do_move(bot_move[0], bot_move[1])
-        message = message + "\\n" + move_res 
+        messages += game_board.do_move(bot_move[0], bot_move[1])
     else:
-      message = "invalid move"
+      messages = ["invalid move"]
 
-    print('drawing board')
     game_board.draw()
-    self._game_board_state = game_board.to_json('blue', message)
+    self._game_board_state = game_board.to_json('blue', messages)
     return self._game_board_state
 
   def has_winner(self):

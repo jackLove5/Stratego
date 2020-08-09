@@ -35,6 +35,8 @@ async def make_move(sid, string):
     board_state = game.process_move(coord_pair)
 
     await sio.emit('boardUpdate', board_state, sid)
+    if game.has_winner():
+      await sio.emit('gameOver')
 
 @sio.on('start_game')
 async def start_game(sid):
@@ -46,11 +48,14 @@ async def start_game(sid):
 async def init_game(sid):
   global sid_to_game
 
-  print('connection from ' + sid)
   sid_to_game[sid] = Game()
   board_state = sid_to_game[sid].get_board_state()
 
   await sio.emit('boardUpdate', board_state, sid)
+
+@sio.on('receive_msg')
+async def receive_msg(sid, msg):
+  pass
 
 app.router.add_get('/', index)
 app.router.add_get('/jquery-3.5.1.min.js', jquery)
