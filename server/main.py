@@ -22,6 +22,10 @@ async def style(request):
   with open('../styles.css') as f:
     return web.Response(text=f.read(), content_type='text/css')
 
+async def piece_img(request):
+  with open('../images/{}.svg'.format(request.match_info['name'])) as f:
+    return web.Response(text=f.read(), content_type='image/svg+xml')
+
 sid_to_game = {}
 
 # front end emits "message" event
@@ -61,6 +65,7 @@ app.router.add_get('/', index)
 app.router.add_get('/jquery-3.5.1.min.js', jquery)
 app.router.add_get('/script.js', js)
 app.router.add_get('/styles.css', style)
+app.router.add_get('/{name:[1-9]|S|F|B}.svg', piece_img)
 
 if __name__ == '__main__':
   web.run_app(app)

@@ -25,12 +25,36 @@ function updateSquares() {
   for (var row = 0; row < gameBoard.size; row++) {
     for (var col = 0; col < gameBoard.size; col++) {
       var obj = (typeof gameBoard.pieces[row][col]) !== 'undefined' ? gameBoard.pieces[row][col] : {};
-      var displayText = ('rank' in obj) ? obj.rank : '';
-      displayText = displayText == "None" ? " " : displayText;
+      var rankText = ('rank' in obj) ? obj.rank : '';
+      rankText = rankText == "None" ? "" : rankText;
       var color = ('team' in obj) ? obj.team : '';
-      $(".row" + row).filter(".col" + col).text(displayText);
+    
+      $(".row" + row).filter(".col" + col).html('');
+      $(".row" + row).filter(".col" + col).text('');
       $(".row" + row).filter(".col" + col).removeClass(['Red', 'Blue', 'None']);
-      $(".row" + row).filter(".col" + col).addClass(color);
+
+      if (rankText === "~") {
+        $(".row" + row).filter(".col" + col).addClass('lake');
+      } else {
+
+        $(".row" + row).filter(".col" + col).addClass(color);
+        if (color === "Blue") {
+          var width = $(".row" + row).filter(".col" + col).width();
+          var height = $(".row" + row).filter(".col" + col).height();
+          var html = '<img src="/' + rankText + '.svg" width="' + width + '" height="' + height + '">';
+          html = html + '<div class="rank-display">';
+          if (rankText !== 'B' && rankText !== 'F') {
+            html = html + rankText;
+          }
+
+          html = html + '</div>';
+          $(".row" + row).filter(".col" + col).html(html);
+        }
+        else
+        {
+          $(".row" + row).filter(".col" + col).text(rankText);
+        }
+      }
     }
   }
 }
@@ -132,7 +156,12 @@ $(document).on('click', '.square', function(e) {
     return
   }
 
-  var classList = $(e.target).attr('class').split(/\s+/);
+  var target = e.target;
+  if (target.nodeName.toLowerCase() == 'img' || $(target).hasClass('rank-display')) {
+    target = $(target).parent();
+  }
+
+  var classList = $(target).attr('class').split(/\s+/);
   var row;
   var col;
 
@@ -148,7 +177,7 @@ $(document).on('click', '.square', function(e) {
   var squareObj = gameBoard.pieces[row][col];
   if (jQuery.isEmptyObject(gameBoard.selected)) {
     if (('team' in squareObj) && squareObj.team == 'Blue'){
-      $(e.target).addClass('select');
+      $(target).addClass('select');
       gameBoard.selected = {row: row, col: col};
     }
   }

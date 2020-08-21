@@ -13,6 +13,7 @@
   display: inline-block;
   box-sizing: border-box;
   width: 30%;
+  background: rgba(255,255,255,255);
 }
 
 #message-box {
@@ -27,15 +28,33 @@
 }
 
 .square {
+  position: relative;
   box-sizing: border-box;
   border: 1px solid black;
   text-align: center;
+  font-size: 2rem;
+  background: rgb(255,255,255);
+}
+
+.rank-display {
+  position: absolute;
+  top: 0;
+  left: 0;
   font-size: 1rem;
+  width: 30%;
+  height: 30%;
+  line-height: initial;
+}
+
+.lake {
+  background: rgb(60,99,151);
+  background: -moz-radial-gradient(center, ellipse cover, rgb(60,99,151) 0%, rgb(10,50,100) 100%);
 }
 
 .Blue {
   color: #0000ff;
 }
+
 .None {
   color: #008800;
 }
