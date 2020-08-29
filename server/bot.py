@@ -1,11 +1,15 @@
-# AI class
 from random import randrange
 from copy import deepcopy
 from pieces import *
 
+"""
+AI class. "get_move" is the only public method
+"""
 class Bot(object):
-  MAX_DEPTH = 3
+  MAX_DEPTH = 2
   INF = 100000000000000
+  BOT_NAME = Constants.PLAYER_TWO_NAME
+  PLAYER_NAME = Constants.PLAYER_ONE_NAME
 
   def __init__(self):
     pass
@@ -44,9 +48,9 @@ class Bot(object):
     for rank in Constants.RANKS:
       if (rank in prob_dist and prob_dist[rank] > 0.0):
         if (rank == 'S'):
-          return Spy(rank, dst_piece.get_team())
+          return Spy(dst_piece.get_team())
         elif (rank == '8'):
-          return Miner(rank, dst_piece.get_team())
+          return Miner(dst_piece.get_team())
         elif (rank.isdigit()):
           return MoveablePiece(rank, dst_piece.get_team())
         else:
@@ -178,8 +182,8 @@ class Bot(object):
      return v[1] 
 
   def _utility(self, board):
-    return (self._calculate_board_score(board, Constants.BOT_NAME)
-      - self._calculate_board_score(board, Constants.PLAYER_NAME))
+    return (self._calculate_board_score(board, Bot.BOT_NAME)
+      - self._calculate_board_score(board, Bot.PLAYER_NAME))
  
   def _calculate_board_score(self, board, team):
 
@@ -212,14 +216,17 @@ class Bot(object):
       return [self._evaluate(board), None]
 
     v = -Bot.INF
-    actions = self._generate_actions(board, Constants.BOT_NAME)
+    actions = self._generate_actions(board, Bot.BOT_NAME)
     best_action = None
     for a in actions:
-      if (board.validate_move(a[0], a[1], Constants.BOT_NAME)):
+      if (board.validate_move(a[0], a[1], Bot.BOT_NAME)):
         new_v = self._min_value(self._result(board, a), alpha, beta, depth + 1)
         if (new_v[0] > v):
           v = new_v[0]
           best_action = a
+        elif new_v[0] == v and randrange(0, 2) == 0:
+          best_action = a
+
                       
         if (v >= beta):
           return [v, best_action]
@@ -232,10 +239,10 @@ class Bot(object):
       return [self._evaluate(board), None]
       
     v = Bot.INF
-    actions = self._generate_actions(board, Constants.PLAYER_NAME)
+    actions = self._generate_actions(board, Bot.PLAYER_NAME)
     best_action = None
     for a in actions:
-      if (board.validate_move(a[0], a[1], Constants.PLAYER_NAME)):  
+      if (board.validate_move(a[0], a[1], Bot.PLAYER_NAME)):  
         new_v = self._max_value(self._result(board, a), alpha, beta, depth + 1)
         if (new_v[0] < v):
           v = new_v[0]

@@ -1,8 +1,9 @@
-"""
-A class that represents an initial stratego setup
-pieces are placed on the board starting from the player's top left corner
-"""
+from constants import *
 
+"""
+A class that represents an initial stratego setup.
+Pieces are placed on the board starting from the player's top left corner
+"""
 class BoardConfiguration:
   def __init__(self, str):
     self._str = str
@@ -14,20 +15,7 @@ class BoardConfiguration:
   Must be 40 characters long and include the correct number of each rank
   """
   def _validate(self, str):
-    valid_piece_counts = {
-      'B': 6,
-      '1': 1,
-      '2': 1,
-      '3': 2,
-      '4': 3,
-      '5': 4,
-      '6': 4,
-      '7': 4,
-      '8': 5,
-      '9': 8,
-      'S': 1,
-      'F': 1
-    }
+    valid_piece_counts = dict(Constants.VALID_PIECE_COUNTS)
 
     for c in str:
       if (c in valid_piece_counts):

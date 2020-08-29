@@ -2,6 +2,10 @@
 # Implements game piece combat and identities
 from constants import *
 
+
+"""
+Generic Stratego game piece
+"""
 class Piece(object):
     # Initializes a new game Piece object
     def __init__(self, rank, team):
@@ -12,15 +16,12 @@ class Piece(object):
         self._moved = False
         self._known_scout = False
 
-    # Returns the piece's name, flag...marshall
     def get_name(self):
         return self._name
 
-    # Returns the piece's rank, 0...10
     def get_rank(self):
         return self._rank
 
-    # Returns the piece's team it belongs to, the player's or AI's team
     def get_team(self):
         return self._team
 
@@ -42,7 +43,10 @@ class Piece(object):
     def set_known_scout(self):
       self.known_scout = True
 
-# Implements the combat between two moveable pieces
+"""
+All numbered pieces and the Spy.
+Implements combat between pieces
+"""
 class MoveablePiece(Piece):
   def __init__(self, rank, team):
     super(MoveablePiece, self).__init__(rank, team)
@@ -59,7 +63,10 @@ class MoveablePiece(Piece):
     else:
       return ord(other.get_rank()) - ord(self.get_rank())
 
-# Implements special Miner combat. Miner beats bomb
+"""
+Miner piece (8)
+Miner beats bomb in combat
+"""
 class Miner(MoveablePiece):
   def __init__(self, team):
     super(Miner, self).__init__('8', team)
@@ -70,7 +77,10 @@ class Miner(MoveablePiece):
 
     return super(Miner, self).combat(other)
 
-# Implements special Spy combat. Spy beats Marshall if Spy attacks first
+"""
+Spy piece (S)
+Spy beats Marshall if Spy attacks first
+"""
 class Spy(MoveablePiece):
   def __init__(self, team):
     super(Spy, self).__init__('S', team)

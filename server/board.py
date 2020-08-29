@@ -1,8 +1,10 @@
 from pieces import *
 from board_configuration import *
-from game import *
 from constants import *
 
+"""
+Construct a piece object given its rank and team
+"""
 def get_piece_from_rank(rank, team):
   if (rank == 'S'):
     ret = Spy(team)
@@ -16,39 +18,38 @@ def get_piece_from_rank(rank, team):
   return ret
 
 """
-Gameboard class. Hold pieces, validates moves, carries out moves, and
+Gameboard class. Holds pieces, validates moves, carries out moves, and
 determines winner
 """
 class Board:
-  def __init__(self, human_pieces, bot_pieces):
-    board = []
-    for i in range(0, Constants.BOARD_SIZE):
-      row = []
-      for j in range(0, Constants.BOARD_SIZE):
-        row.append(None)
-      board.append(row)
+  def __init__(self, p1_pieces, p2_pieces):
+    self._board = [[None for x in range(Constants.BOARD_SIZE)] for y in range(Constants.BOARD_SIZE)]
+    self._place_pieces(p1_pieces, False)
+    self._place_pieces(p2_pieces, True)
 
-    # Place bot pieces (fill rows 0-3)
-    b_config = bot_pieces.get_config()
-    col = 9
-    for i, c in enumerate(b_config):
-      board[int(3 - i // Constants.BOARD_SIZE)][col] = (
-        get_piece_from_rank(c, Constants.BOT_NAME))
-
-      col = (int(col - 1 + Constants.BOARD_SIZE)) % Constants.BOARD_SIZE
-
-    # Place human's pieces (fill rows 6-9)
-    h_config = human_pieces.get_config()
+  """
+  Place a given player's pieces on the board
+  """
+  def _place_pieces(self, pieces, is_player2):
+    if is_player2:
+      self._flip()
+    
+    # Fill rows 6-9
+    p_config = pieces.get_config()
     col = 0
-    for i, c in enumerate(h_config):
-      board[int(6 + (i // Constants.BOARD_SIZE))][col] = (
-        get_piece_from_rank(c, Constants.PLAYER_NAME))
+    team = Constants.PLAYER_TWO_NAME if is_player2 else Constants.PLAYER_ONE_NAME
+    for i, c in enumerate(p_config):
+      self._board[int(6 + i // Constants.BOARD_SIZE)][col] = (
+        get_piece_from_rank(c, team))
 
       col = (col + 1) % Constants.BOARD_SIZE
 
-    self._board = board
+    if is_player2:
+      self._flip()
 
-  # print the board to the screen
+  """
+  Print the board to the screen
+  """
   def draw(self):
     board = self._board
     for i in range(len(board)):
@@ -58,7 +59,7 @@ class Board:
           print('~', end='')
         elif(board[i][j] is None):
           print('_', end='')
-        elif (board[i][j].get_team() == Constants.BOT_NAME):
+        elif (board[i][j].get_team() == Constants.PLAYER_TWO_NAME):
           print('\033[31m' + board[i][j].get_rank() + '\033[0m', end='')
         else:
           print('\033[34m' + board[i][j].get_rank() + '\033[0m', end='')
@@ -66,8 +67,15 @@ class Board:
       print()
 
     print('  ABCDEFGHIJ')
-  
-  def to_json(self, turn, messages):
+ 
+  """
+  Serialize the board given the current player's name, 
+  and messages to include, and the player's name who should move next
+  """ 
+  def to_json(self, current_player_name, messages, turn):
+    if current_player_name == Constants.PLAYER_TWO_NAME:
+      self._flip()
+
     json = '{"board": '
     board = self._board
     json += '['
@@ -78,7 +86,7 @@ class Board:
           json += '{"rank": "~", "team": "None"}'
         elif(board[i][j] is None):
           json += '{"rank": "None", "team": "None"}'
-        elif (board[i][j].get_team() == Constants.BOT_NAME):
+        elif (board[i][j].get_team() != current_player_name):
           json += '{"rank": "X", "team": "Red"}'
         else:
           json += '{"rank": "' + board[i][j].get_rank() + '", "team": "Blue"}'
@@ -88,20 +96,41 @@ class Board:
       json += (']' if i == len(board) - 1 else ',')
 
     if (self.has_win()):
-      messages.append(self.get_winner() + ' wins!')
+      winner_name = self.get_winner()
+      message = 'You win!' if winner_name == current_player_name else 'Your opponent wins!'
+      messages.append(message)
 
-    json +=  ',"Turn": "' + turn + '"'
     json += ',"messages": ['
     for i in range(len(messages)):
       json += '"' + messages[i] + '"'
       if i < len(messages) - 1:
         json += ','
     
-    json += ']}'
+    json += '], "turn": ';
+    json += '"Blue"' if turn == current_player_name else '"Red"'
+    json += '}'
+
+    if current_player_name == Constants.PLAYER_TWO_NAME:
+      self._flip()
+
     return json
 
   """
-  swap two game pieces
+  Rotate the board 180 degrees
+  """
+  def _flip(self): 
+    for row in range(len(self._board)):
+      self._board[row] = self._board[row][::-1]
+    
+    for col in range(len(self._board)):
+      column = [self._board[x][col] for x in range(len(self._board))]
+      column = column[::-1]
+      
+      for x in range(len(self._board)):
+        self._board[x][col] = column[x]
+
+  """
+  Swap two game pieces
   positions are lists: [row, col]
   """ 
   def swap_pieces(self, pos1, pos2):
@@ -110,20 +139,23 @@ class Board:
     self._board[pos2[0]][pos2[1]] = tmp
 
   """
-  return true iff the position holds one of the human's pieces
+  Return true iff the position holds one of the specified player's pieces
   precondition: 'pos' is a valid position on the board
   """
-  def has_player_piece(self, pos):
+  def has_player_piece(self, pos, player_name):
     obj = self._board[pos[0]][pos[1]]
     if (obj is None):
       return False
 
-    return obj.get_team() == Constants.PLAYER_NAME
+    return obj.get_team() == player_name
 
   """
   Validate a player's movement. Returns true iff the move is valid
   """
   def validate_move(self, src_pos, dst_pos, team_to_move):
+    if any(x < 0 or x >= len(self._board) for x in src_pos + dst_pos):
+      return False
+
     src_obj = self._board[src_pos[0]][src_pos[1]]
     dst_obj = self._board[dst_pos[0]][dst_pos[1]]
     # Tried to move from an empty space
@@ -184,7 +216,10 @@ class Board:
     # true iff destination space is empty or occupied by opposite team
     return (dst_obj is None) or (dst_obj.get_team() != src_obj.get_team())
 
-  # execute a valid move
+  """
+  Execute a valid move.
+  Return any combat results as a list of pairs: [dead_piece, attacking_piece]
+  """
   def do_move(self, src_pos, dst_pos):
     board = self._board
     src_y = src_pos[0]
@@ -199,7 +234,7 @@ class Board:
 
     src_obj.set_has_moved()
     board[src_y][src_x] = None
-    messages = []
+    combat_results = []
     if (dst_obj is None):
       # Moved to empty space
       board[dst_y][dst_x] = src_obj
@@ -210,64 +245,72 @@ class Board:
       src_obj.set_is_visible()
       dst_obj.set_is_visible()
       
-      src_dead = False
-      dst_dead = False
       combat_res = src_obj.combat(dst_obj)
+      
       if (combat_res < 0):
-        src_dead = True
+        # src_obj gets captured
+        combat_results.append([src_obj, dst_obj])
       elif (combat_res > 0):
+        # dst_obj gets captured
         board[dst_y][dst_x] = src_obj
-        dst_dead = True
+        combat_results.append([dst_obj, src_obj])
       else:
+        # both pieces get captured
         board[dst_y][dst_x] = None
-        src_dead = True
-        dst_dead = True
+        combat_results.append([dst_obj, src_obj])
+        combat_results.append([src_obj, dst_obj])
 
-      if (src_dead):
-        string = (src_obj.get_team() + "'s " + src_obj.get_name() + 
-          " removed by " + dst_obj.get_team() + "'s " + dst_obj.get_name())
-        messages.append(string)
+    return combat_results
 
-      if (dst_dead):
-        string = dst_obj.get_team() + "\'s " + dst_obj.get_name() + ' removed by ' + \
-          src_obj.get_team() + "\'s " + src_obj.get_name()
-        messages.append(string)
-
-    return messages
-
-  # checks win consition. Return true iff there's a winner
+  """
+  Check win condition. Return true iff there's a winner
+  """
   def has_win(self):
     # return true if there's only 1 flag on the board
     # or if only one team has moveable pieces
     has_moveable_list = []
     board = self._board
     flag_count = 0
-    for row in board:
-      for piece in row:
+    for row in range(len(board)):
+      for col in range(len(board)):
+        piece = board[row][col]
         if (piece is not None):
           if (piece.get_rank() == 'F'):
             flag_count = flag_count + 1
-          elif (piece.get_rank() != 'B'):
+          elif piece.get_rank() != 'B' and self._has_move(row, col, piece.get_team()):
             if (piece.get_team() not in has_moveable_list):
               has_moveable_list.append(piece.get_team())
 
     return flag_count == 1 or len(has_moveable_list) < 2
 
   """
+  Check if a piece is able to make a move
+  """
+  def _has_move(self, row, col, team):
+    res = False
+    src_pos = [row, col]
+    for x in [-1, 1]:
+      res = res or self.validate_move(src_pos, [row + x, col], team)
+      res = res or self.validate_move(src_pos, [row, col + x], team)
+    return res
+
+
+  """
   get the winner of the game
-  precondition: a team has one the game
+  precondition: a team has won the game
   """
   def get_winner(self):
     board = self._board
     has_flag_list = []
     has_moveable_list = []
-    for row in board:
-      for piece in row:
+    for row in range(len(board)):
+      for col in range(len(board)):
+        piece = board[row][col]
         if (piece is not None):
           if (piece.get_rank() == 'F'):
             if (piece.get_team() not in has_flag_list):
               has_flag_list.append(piece.get_team())
-          elif (piece.get_rank() != 'B'):
+          elif (piece.get_rank() != 'B') and self._has_move(row, col, piece.get_team()):
             if (not (piece.get_team() in has_moveable_list)):
               has_moveable_list.append(piece.get_team())
 

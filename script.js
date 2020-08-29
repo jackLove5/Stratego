@@ -1,33 +1,37 @@
+
 var gameBoard = {};
 
 function initBoard() {
-  for (var i = 0; i < gameBoard.size; i++) {
+  for (let i = 0; i < gameBoard.size; i++) {
     gameBoard.pieces[i] = new Array(gameBoard.size);
-    for (var j = 0; j < gameBoard.size; j++) {
+    for (let j = 0; j < gameBoard.size; j++) {
       gameBoard.pieces[i][j] = {rank: 1, team: "Blue"};
     }
   }
 }
 
 function initSquares() {
-  for (var row = 0; row < gameBoard.size; row++) {
-    for (var col = 0; col < gameBoard.size; col++) {
-      var obj = (typeof gameBoard.pieces[row][col]) !== 'undefined' ? gameBoard.pieces[row][col] : {};
-      var displayText = ('rank' in obj) ? obj.rank : '';
-      var color = ('team' in obj) ? obj.team : '';
-      var divStr = "<div class=\"square " + "row"+row + " col"+col + " " + color + " \">" +  displayText + "</div>";
+  for (let row = 0; row < gameBoard.size; row++) {
+    for (let col = 0; col < gameBoard.size; col++) {
+      let obj = gameBoard.pieces[row][col];
+      let displayText = ('rank' in obj) ? obj.rank : '';
+      let color = ('team' in obj) ? obj.team : '';
+      let divStr = `<div class="square row${row} col${col} ${color}">${displayText}</div>`
       $("#board").append(divStr);
     }
   }
 }
 
 function updateSquares() {
-  for (var row = 0; row < gameBoard.size; row++) {
-    for (var col = 0; col < gameBoard.size; col++) {
-      var obj = (typeof gameBoard.pieces[row][col]) !== 'undefined' ? gameBoard.pieces[row][col] : {};
-      var rankText = ('rank' in obj) ? obj.rank : '';
-      rankText = rankText == "None" ? "" : rankText;
-      var color = ('team' in obj) ? obj.team : '';
+  for (let row = 0; row < gameBoard.size; row++) {
+    for (let col = 0; col < gameBoard.size; col++) {
+      let obj = gameBoard.pieces[row][col];
+      let rankText = '';
+      if ('rank' in obj && obj.rank !== 'None') {
+        rankText = obj.rank;
+      }
+      
+      let color = ('team' in obj) ? obj.team : '';
     
       $(".row" + row).filter(".col" + col).html('');
       $(".row" + row).filter(".col" + col).text('');
@@ -60,13 +64,15 @@ function updateSquares() {
 }
 
 function sendMove(src, dst) {
-  var boardStr = src.row.toString() + src.col.toString() + dst.row.toString() + dst.col.toString();
+  let boardStr = `${src.row}${src.col}${dst.row}${dst.col}`
   socket.emit("receive_move", boardStr);
 }
 
 function startGame() {
-  socket.emit("start_game");
+  let board_config = getBoardConfig();
+  socket.emit("receive_config", board_config);
   $('#start-button').hide();
+  gameBoard.inSetup = false;
 }
 
 function sendChat() { 
@@ -102,7 +108,8 @@ function initGame() {
   gameBoard.size = 10;
   gameBoard.pieces = new Array(gameBoard.size);
   gameBoard.selected = {};
-  gameBoard.gameOver = false
+  gameBoard.gameOver = false;
+  gameBoard.inSetup = true;
   $('#start-button').off('click').click(startGame);
   $('#start-button').text('Start game');
   $('#start-button').show();
@@ -112,7 +119,6 @@ function initGame() {
   initBoard();
   initSquares();
   centerSquareText();
-  socket.emit("connection");
 }
 
 const socket = io("http://localhost:8080");
@@ -120,6 +126,7 @@ const socket = io("http://localhost:8080");
 socket.on("boardUpdate", function(data) {
   var obj = JSON.parse(data);
   gameBoard.pieces = obj.board;
+  gameBoard.turn = obj.turn;
   updateSquares();
 
   var messages = obj.messages;
@@ -130,13 +137,32 @@ socket.on("boardUpdate", function(data) {
 
 });
 
+socket.on('receiveChat', function(msgText) {
+  
+  let msgDiv = `<div class="message-item">${msgText}</div>`;
+  $('#message-box').append(msgDiv);
+});
+
 socket.on("gameOver", function() {
   gameBoard.gameOver = true;
-  $('#message-box').append('Click the button to play again');
-  $('#start-button').text('New game');
-  $('#start-button').off('click').click(initGame);
-  $('#start-button').show();
+  if (gameBoard.type === "BOT") {
+    $('#message-box').append('Click the button to play again');
+    $('#start-button').text('New game');
+    $('#start-button').off('click').click(newBotGame);
+    $('#start-button').show();
+  }
+  else {
+    $('#start-button').text('Rematch? (0/2)');
+    $('#start-button').off('click').click(() => socket.emit('rematch'));
+    $('#start-button').show();
+  }
 });
+
+socket.on('rematchCount', function(rematchCount) {
+  $('#start-button').text(`Rematch? (${rematchCount}/2)`);
+});
+
+socket.on('resetGui', initGame);
 
 window.addEventListener('resize', function() {
   setDivHeights();
@@ -152,7 +178,7 @@ $(document).keyup(function(e) {
 
 $(document).on('click', '.square', function(e) {
 
-  if (gameBoard.gameOver) {
+  if (gameBoard.gameOver || (gameBoard.turn != 'Blue' && !gameBoard.inSetup)) {
     return
   }
 
@@ -186,12 +212,78 @@ $(document).on('click', '.square', function(e) {
     $('.square').each(function(index) {
       $(this).removeClass('select');
     });
-     
-    sendMove(gameBoard.selected, dst);
+
+    if (gameBoard.inSetup && 'team' in squareObj && squareObj.team == 'Blue') {
+      let srcRow = gameBoard.selected.row;
+      let srcCol = gameBoard.selected.col;
+      let dstRow = dst.row;
+      let dstCol = dst.col;
+
+      let tmp = gameBoard.pieces[srcRow][srcCol];
+      gameBoard.pieces[srcRow][srcCol] = gameBoard.pieces[dstRow][dstCol];
+      gameBoard.pieces[dstRow][dstCol] = tmp;
+      updateSquares();
+    }
+    else if (!gameBoard.inSetup){
+      sendMove(gameBoard.selected, dst);
+      if (gameBoard.type === 'BOT') {
+        socket.emit('do_bot_move');
+      }
+    }
+
     gameBoard.selected = {};
   }
 });
 
-setDivHeights();
-initGame();
+function getBoardConfig() {
+  let ret = '';
+  gameBoard.pieces.forEach((row) => row.forEach(piece => 
+    ret += 'team' in piece && piece.team == 'Blue' ? piece.rank : ''));
 
+  return ret;
+}
+
+function newBotGame() {
+  initGame();
+  gameBoard.type = 'BOT';
+
+  $('#new-bot-game').hide();
+  $('#new-pvp-game').hide();
+  $('#start-button').show();
+  $('#message-text').show();
+  $('#send-button').show();
+  socket.emit("new_bot_game");
+}
+
+function newPvpGame() {
+  initGame();
+  gameBoard.type = 'PVP';
+
+  $('#new-bot-game').hide();
+  $('#new-pvp-game').hide();
+  $('#start-button').show();
+  $('#message-text').show();
+  $('#send-button').show();
+  socket.emit("new_pvp_game");
+}
+
+
+window.onload = function() {
+
+  setDivHeights();
+  $('#start-button').hide();
+  $('#message-text').hide();
+  $('#send-button').hide();
+
+  let pathname = window.location.pathname;
+  if (pathname.indexOf('join') !== -1) {
+    let id = pathname.substr(pathname.indexOf('join') + 'join/'.length);
+    initGame();
+    $('#new-bot-game').hide();
+    $('#new-pvp-game').hide();
+    $('#start-button').show();
+    $('#message-text').show();
+    $('#send-button').show();
+    socket.emit('join', id);
+  }
+};
