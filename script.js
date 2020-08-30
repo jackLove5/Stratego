@@ -79,9 +79,9 @@ function sendChat() {
   var msg = $('#message-text').val();
   $('#message-text').val('');
 
-  var msgDiv = '<div class="message-item">' + msg + '</div>';
+  var msgDiv = '<div class="message-item chat-item"><strong class="you-msg">You: </strong>' + msg + '</div>';
   $('#message-box').append(msgDiv);
-  socket.emit('receive_msg', msg);
+  socket.emit('receive_chat', msg);
 }
 
 function setDivHeights() {
@@ -131,15 +131,20 @@ socket.on("boardUpdate", function(data) {
 
   var messages = obj.messages;
   for (var i = 0; i < messages.length; i++) {
-    var msgDiv = '<div class="message-item">' + messages[i] + '</div>';
+    var msgDiv = '<div class="message-item"><i>' + messages[i] + '</i></div>';
     $('#message-box').append(msgDiv);
   }
 
 });
 
-socket.on('receiveChat', function(msgText) {
+socket.on('receiveMessage', function(msgText) {
   
-  let msgDiv = `<div class="message-item">${msgText}</div>`;
+  let msgDiv = `<div class="message-item"><i>${msgText}</i></div>`;
+  $('#message-box').append(msgDiv);
+});
+
+socket.on('receiveChat', function(msg) {
+  let msgDiv = '<div class="message-item chat-item"><strong class="opp-msg">Opponent: </strong>' + msg + '</div>';
   $('#message-box').append(msgDiv);
 });
 

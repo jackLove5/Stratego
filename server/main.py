@@ -68,7 +68,7 @@ async def receive_config(sid, string):
     all_messages = game.set_board_config(sid, string)
     all_messages = [m for m in all_messages if m.recipient_sid is not None]
     for m in all_messages:
-      await sio.emit('receiveChat', m.message, m.recipient_sid)
+      await sio.emit('receiveMessage', m.message, m.recipient_sid)
     if game.has_begun():
       json = game.get_board_json(sid, [])
       await sio.emit('boardUpdate', json, sid)
@@ -149,8 +149,8 @@ async def do_bot_move(sid):
     json = game.get_board_json(sid, messages)
     await sio.emit('boardUpdate', json, sid)
 
-@sio.on('receive_msg')
-async def receive_msg(sid, msg):
+@sio.on('receive_chat')
+async def receive_chat(sid, msg):
   game = sid_to_game[sid]
   opp_sid = game.get_opponent_sid(sid)
   if opp_sid is not None:
@@ -162,7 +162,7 @@ async def disconnect(sid):
     game = sid_to_game[sid]
     opp_sid = game.get_opponent_sid(sid)
     if opp_sid is not None:
-      await sio.emit('receiveChat', 'opponent disconnected')
+      await sio.emit('receiveMessage', 'opponent disconnected')
 
     del sid_to_game[sid]
  
