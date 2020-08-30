@@ -148,6 +148,9 @@ async def do_bot_move(sid):
     messages = [x.message for x in messages if x.recipient_sid == sid]
     json = game.get_board_json(sid, messages)
     await sio.emit('boardUpdate', json, sid)
+    
+    if game.has_winner():
+      await sio.emit('gameOver')
 
 @sio.on('receive_chat')
 async def receive_chat(sid, msg):
