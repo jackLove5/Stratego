@@ -111,7 +111,7 @@ async def join_pvp_game(sid, join_id):
   global sid_to_game
 
   if join_id not in join_id_to_game:
-    await sio.emit('sendMessage', 'Error. Invalid or stale url', sid)
+    await sio.emit('receiveMessage', 'Error. Invalid or stale url', sid)
   else:
     game = join_id_to_game[join_id]
     del join_id_to_game[join_id]
@@ -120,6 +120,9 @@ async def join_pvp_game(sid, join_id):
     sid_to_game[sid] = game
     json = game.get_board_json(sid, ["Swap pieces then click the button to ready up"])
     await sio.emit('boardUpdate', json, sid)
+
+    opp_sid = game.get_opponent_sid(sid)
+    await sio.emit('receiveMessage', 'Opponent connected', opp_sid)
 
 @sio.on('rematch')
 async def process_rematch_vote(sid):
