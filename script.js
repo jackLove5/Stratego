@@ -75,12 +75,17 @@ function startGame() {
   gameBoard.inSetup = false;
 }
 
-function sendChat() { 
+function sendChat() {
+
   var msg = $('#message-text').val();
   $('#message-text').val('');
+  if (msg === '') {
+    return;
+  }
 
   var msgDiv = '<div class="message-item chat-item"><strong class="you-msg">You: </strong>' + msg + '</div>';
   $('#message-box').append(msgDiv);
+  $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
   socket.emit('receive_chat', msg);
 }
 
@@ -97,9 +102,16 @@ function setDivHeights() {
 }
 
 function centerSquareText() {
-  var squareHeight = $('.square').height();
+  let squareHeight = $('.square').height();
+  let squareWidth = $('.square').width();
+  
   $('.square').css({
     'line-height': squareHeight + 'px'
+  });
+  
+  $('img').css({
+    'height': squareHeight,
+    'width': squareWidth
   });
 }
 
@@ -133,6 +145,7 @@ socket.on("boardUpdate", function(data) {
   for (var i = 0; i < messages.length; i++) {
     var msgDiv = '<div class="message-item"><i>' + messages[i] + '</i></div>';
     $('#message-box').append(msgDiv);
+    $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
   }
 
 });
@@ -141,17 +154,20 @@ socket.on('receiveMessage', function(msgText) {
   
   let msgDiv = `<div class="message-item"><i>${msgText}</i></div>`;
   $('#message-box').append(msgDiv);
+  $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
 });
 
 socket.on('receiveChat', function(msg) {
   let msgDiv = '<div class="message-item chat-item"><strong class="opp-msg">Opponent: </strong>' + msg + '</div>';
   $('#message-box').append(msgDiv);
+  $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
 });
 
 socket.on("gameOver", function() {
   gameBoard.gameOver = true;
   if (gameBoard.type === "BOT") {
-    $('#message-box').append('Click the button to play again');
+    $('#message-box').append(`<div class="message-item"><i>Click the button to play again</i></div>`);
+    $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
     $('#start-button').text('New game');
     $('#start-button').off('click').click(newBotGame);
     $('#start-button').show();
@@ -184,7 +200,7 @@ $(document).keyup(function(e) {
 $(document).on('click', '.square', function(e) {
 
   if (gameBoard.gameOver || (gameBoard.turn != 'Blue' && !gameBoard.inSetup)) {
-    return
+    return;
   }
 
   var target = e.target;
@@ -206,6 +222,10 @@ $(document).on('click', '.square', function(e) {
   }
 
   var squareObj = gameBoard.pieces[row][col];
+  if (!gameBoard.inSetup && (squareObj.rank === 'F' || squareObj.rank === 'B')) {
+    return;
+  }
+
   if (jQuery.isEmptyObject(gameBoard.selected)) {
     if (('team' in squareObj) && squareObj.team == 'Blue'){
       $(target).addClass('select');
