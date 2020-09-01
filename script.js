@@ -1,5 +1,4 @@
-
-var gameBoard = {};
+let gameBoard = {};
 
 function initBoard() {
   for (let i = 0; i < gameBoard.size; i++) {
@@ -14,9 +13,7 @@ function initSquares() {
   for (let row = 0; row < gameBoard.size; row++) {
     for (let col = 0; col < gameBoard.size; col++) {
       let obj = gameBoard.pieces[row][col];
-      let displayText = ('rank' in obj) ? obj.rank : '';
-      let color = ('team' in obj) ? obj.team : '';
-      let divStr = `<div class="square row${row} col${col} ${color}">${displayText}</div>`
+      let divStr = `<div class="square row${row} col${col} ${obj.team}">${obj.rank}</div>`
       $("#board").append(divStr);
     }
   }
@@ -26,36 +23,31 @@ function updateSquares() {
   for (let row = 0; row < gameBoard.size; row++) {
     for (let col = 0; col < gameBoard.size; col++) {
       let obj = gameBoard.pieces[row][col];
-      let rankText = '';
-      if ('rank' in obj && obj.rank !== 'None') {
-        rankText = obj.rank;
-      }
-      
-      let color = ('team' in obj) ? obj.team : '';
-    
+ 
       $(".row" + row).filter(".col" + col).html('');
       $(".row" + row).filter(".col" + col).text('');
       $(".row" + row).filter(".col" + col).removeClass(['Red', 'Blue', 'None']);
 
-      if (rankText === "~") {
+      if (obj.rank === "~") {
         $(".row" + row).filter(".col" + col).addClass('lake');
       } else {
 
-        $(".row" + row).filter(".col" + col).addClass(color);
-        if (color === "Blue") {
-          var width = $(".row" + row).filter(".col" + col).width();
-          var height = $(".row" + row).filter(".col" + col).height();
-          var html = '<img src="/' + rankText + '.svg" width="' + width + '" height="' + height + '">';
-          html = html + '<div class="rank-display">';
-          if (rankText !== 'B' && rankText !== 'F') {
-            html = html + rankText;
+        $(".row" + row).filter(".col" + col).addClass(obj.team);
+        if (obj.team === "Blue") {
+          let width = $(".row" + row).filter(".col" + col).width();
+          let height = $(".row" + row).filter(".col" + col).height();
+          let html = `<img src="/${obj.rank}.svg" width="${width}" height="${height}">`;
+          html += '<div class="rank-display">';
+          if (obj.rank !== 'B' && obj.rank !== 'F') {
+            html += obj.rank;
           }
 
-          html = html + '</div>';
+          html += '</div>';
           $(".row" + row).filter(".col" + col).html(html);
         }
         else
         {
+          let rankText = obj.rank === 'None' ? '' : obj.rank;
           $(".row" + row).filter(".col" + col).text(rankText);
         }
       }
@@ -76,21 +68,20 @@ function startGame() {
 }
 
 function sendChat() {
-
-  var msg = $('#message-text').val();
+  let msg = $('#message-text').val();
   $('#message-text').val('');
   if (msg === '') {
     return;
   }
 
-  var msgDiv = '<div class="message-item chat-item"><strong class="you-msg">You: </strong>' + msg + '</div>';
+  let msgDiv = `<div class="message-item chat-item"><strong class="you-msg">You: </strong>${msg}</div>`;
   $('#message-box').append(msgDiv);
   $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
   socket.emit('receive_chat', msg);
 }
 
 function setDivHeights() {
-  var boardWidth = $('#board').width();
+  let boardWidth = $('#board').width();
 
   $('#board').css({
     'height': boardWidth + 'px'
@@ -136,29 +127,27 @@ function initGame() {
 const socket = io("http://localhost:8080");
 
 socket.on("boardUpdate", function(data) {
-  var obj = JSON.parse(data);
+  let obj = JSON.parse(data);
   gameBoard.pieces = obj.board;
   gameBoard.turn = obj.turn;
   updateSquares();
 
-  var messages = obj.messages;
-  for (var i = 0; i < messages.length; i++) {
-    var msgDiv = '<div class="message-item"><i>' + messages[i] + '</i></div>';
+  let messages = obj.messages;
+  for (let i = 0; i < messages.length; i++) {
+    let msgDiv = `<div class="message-item"><i>${messages[i]}</i></div>`;
     $('#message-box').append(msgDiv);
     $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
   }
-
 });
 
-socket.on('receiveMessage', function(msgText) {
-  
+socket.on('receiveMessage', function(msgText) { 
   let msgDiv = `<div class="message-item"><i>${msgText}</i></div>`;
   $('#message-box').append(msgDiv);
   $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
 });
 
 socket.on('receiveChat', function(msg) {
-  let msgDiv = '<div class="message-item chat-item"><strong class="opp-msg">Opponent: </strong>' + msg + '</div>';
+  let msgDiv = `<div class="message-item chat-item"><strong class="opp-msg">Opponent: </strong>${msg}</div>`;
   $('#message-box').append(msgDiv);
   $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
 });
@@ -169,7 +158,7 @@ socket.on("gameOver", function() {
     $('#message-box').append(`<div class="message-item"><i>Click the button to play again</i></div>`);
     $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
     $('#start-button').text('New game');
-    $('#start-button').off('click').click(newBotGame);
+    $('#start-button').off('click').click(newGame('BOT'));
     $('#start-button').show();
   }
   else {
@@ -198,47 +187,37 @@ $(document).keyup(function(e) {
 });
 
 $(document).on('click', '.square', function(e) {
-
   if (gameBoard.gameOver || (gameBoard.turn != 'Blue' && !gameBoard.inSetup)) {
     return;
   }
 
-  var target = e.target;
+  let target = e.target;
   if (target.nodeName.toLowerCase() == 'img' || $(target).hasClass('rank-display')) {
     target = $(target).parent();
   }
 
-  var classList = $(target).attr('class').split(/\s+/);
-  var row;
-  var col;
+  let classList = $(target).attr('class').split(/\s+/);
+  let row = classList.filter((x) => x.search('row') !== -1)[0][3];
+  let col = classList.filter((x) => x.search('col') !== -1)[0][3];
 
-  for (var i = 0; i < classList.length; i++) {
-    if (classList[i].search('row') !== -1) {
-      row = parseInt(classList[i][3]);
-    }
-    else if (classList[i].search('col') !== -1) {
-      col = parseInt(classList[i][3]);
-    }
-  }
-
-  var squareObj = gameBoard.pieces[row][col];
+  let squareObj = gameBoard.pieces[row][col];
   if (!gameBoard.inSetup && (squareObj.rank === 'F' || squareObj.rank === 'B')) {
     return;
   }
 
   if (jQuery.isEmptyObject(gameBoard.selected)) {
-    if (('team' in squareObj) && squareObj.team == 'Blue'){
+    if (squareObj.team === 'Blue'){
       $(target).addClass('select');
       gameBoard.selected = {row: row, col: col};
     }
   }
   else {
-    var dst = {row: row, col: col};
+    let dst = {row: row, col: col};
     $('.square').each(function(index) {
       $(this).removeClass('select');
     });
 
-    if (gameBoard.inSetup && 'team' in squareObj && squareObj.team == 'Blue') {
+    if (gameBoard.inSetup && squareObj.team === 'Blue') {
       let srcRow = gameBoard.selected.row;
       let srcCol = gameBoard.selected.col;
       let dstRow = dst.row;
@@ -263,38 +242,26 @@ $(document).on('click', '.square', function(e) {
 function getBoardConfig() {
   let ret = '';
   gameBoard.pieces.forEach((row) => row.forEach(piece => 
-    ret += 'team' in piece && piece.team == 'Blue' ? piece.rank : ''));
+    ret += piece.team === 'Blue' ? piece.rank : ''));
 
   return ret;
 }
 
-function newBotGame() {
+function newGame(type) {
   initGame();
-  gameBoard.type = 'BOT';
+  gameBoard.type = type;
 
   $('#new-bot-game').hide();
   $('#new-pvp-game').hide();
   $('#start-button').show();
   $('#message-text').show();
   $('#send-button').show();
-  socket.emit("new_bot_game");
+
+  let funcName = type === 'PVP' ? 'new_pvp_game' : 'new_bot_game';
+  socket.emit(funcName);
 }
-
-function newPvpGame() {
-  initGame();
-  gameBoard.type = 'PVP';
-
-  $('#new-bot-game').hide();
-  $('#new-pvp-game').hide();
-  $('#start-button').show();
-  $('#message-text').show();
-  $('#send-button').show();
-  socket.emit("new_pvp_game");
-}
-
 
 window.onload = function() {
-
   setDivHeights();
   $('#start-button').hide();
   $('#message-text').hide();
