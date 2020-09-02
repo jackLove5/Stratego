@@ -1,8 +1,9 @@
-from board import *
-from board_configuration import *
-from bot import *
-from abstract_game import *
-from message import *
+from board import Board
+from board_configuration import BoardConfiguration
+from bot import Bot
+from abstract_game import AbstractGame
+from message import Message
+from constants import Constants
 import random
 
 """
@@ -34,7 +35,6 @@ class BotGame(AbstractGame):
     else:
       messages = [Message(self._player1_sid, 'invalid move')]
 
-    game_board.draw()
     return messages
 
   """

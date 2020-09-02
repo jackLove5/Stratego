@@ -1,7 +1,8 @@
-from board import *
-from board_configuration import *
-from abstract_game import *
-from message import *
+from board import Board
+from board_configuration import BoardConfiguration
+from abstract_game import AbstractGame
+from message import Message
+from constants import Constants
 
 """
 A class representing a Player vs Player game
@@ -12,6 +13,7 @@ class PvPGame(AbstractGame):
     super().__init__(player1_sid)
     self._turn = "None"
     self._rematch_votes = []
+    self._join_id = None
 
   """
   Validate and process a move from one of the players
@@ -63,3 +65,15 @@ class PvPGame(AbstractGame):
       self._rematch_votes.append(sid)
 
     return len(self._rematch_votes)
+
+  """
+  Set the game's join id
+  """
+  def set_join_id(self, id):
+    self._join_id = id
+
+  """
+  Get the game's join id
+  """
+  def get_join_id(self):
+    return self._join_id

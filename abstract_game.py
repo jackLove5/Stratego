@@ -1,7 +1,7 @@
-from constants import *
-from board_configuration import *
-from board import *
-from message import *
+from constants import Constants
+from board_configuration import BoardConfiguration
+from board import Board
+from message import Message
 
 """
 An "abstract" class representing a game of Stratego.

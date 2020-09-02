@@ -1,6 +1,6 @@
 from pieces import *
-from board_configuration import *
-from constants import *
+from board_configuration import BoardConfiguration
+from constants import Constants
 
 """
 Construct a piece object given its rank and team

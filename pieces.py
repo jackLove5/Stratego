@@ -1,7 +1,6 @@
 # Contains all the Piece classes
 # Implements game piece combat and identities
-from constants import *
-
+from constants import Constants
 
 """
 Generic Stratego game piece

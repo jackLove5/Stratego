@@ -1,4 +1,4 @@
-from constants import *
+from constants import Constants
 
 """
 A class that represents an initial stratego setup.

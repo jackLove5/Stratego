@@ -1,9 +1,9 @@
 from flask import Flask, Response, request
 from flask_socketio import SocketIO
 from markupsafe import escape
-from abstract_game import *
-from bot_game import *
-from pvp_game import *
+from bot_game import BotGame
+from pvp_game import PvPGame
+from constants import Constants
 import random, string
 
 app = Flask(__name__)
@@ -12,9 +12,9 @@ sio = SocketIO(app)
 
 sid_to_game = {}
 join_id_to_game = {}
+
 @sio.on('receive_move')
 def make_move(string):
-  global sid_to_game
   sid = request.sid
 
   game = None if sid not in sid_to_game else sid_to_game[sid]
@@ -57,7 +57,6 @@ def receive_config(string):
 @sio.on('new_bot_game')
 def init_bot_game():
   sid = request.sid
-  global sid_to_game
   sid_to_game[sid] = BotGame(sid)
   json = sid_to_game[sid].get_board_json(sid, ["Swap pieces then click the button to start the game"])
 
@@ -72,7 +71,6 @@ def get_new_id():
 
 @sio.on('new_pvp_game')
 def init_pvp_game():
-  global sid_to_game
   sid = request.sid
 
   new_game = PvPGame(sid)
@@ -80,6 +78,7 @@ def init_pvp_game():
   
   join_id = get_new_id()
   join_id_to_game[join_id] = new_game
+  new_game.set_join_id(join_id)
 
   join_url = '/join/' + join_id
   json = new_game.get_board_json(sid, ['Join url: ' + join_url, 'Swap pieces then click the button to ready up'])
@@ -87,7 +86,6 @@ def init_pvp_game():
 
 @sio.on('join')
 def join_pvp_game(join_id):
-  global sid_to_game
   sid = request.sid
 
   if join_id not in join_id_to_game:
@@ -95,6 +93,7 @@ def join_pvp_game(join_id):
   else:
     game = join_id_to_game[join_id]
     del join_id_to_game[join_id]
+    game.set_join_id(None)
 
     game.add_player2(sid)
     sid_to_game[sid] = game
@@ -108,27 +107,28 @@ def join_pvp_game(join_id):
 def process_rematch_vote():
   sid = request.sid
 
-  game = sid_to_game[sid]
-  count = game.add_rematch_vote(sid)
-  opp_sid = game.get_opponent_sid(sid)
-  sio.emit('rematchCount', count, room=sid)
-  sio.emit('rematchCount', count, room=opp_sid)
-  if count == 2:
-    new_game = PvPGame(sid)
-    player1_json = new_game.get_board_json(sid, ["Swap pieces then click the button to ready up"])
-    new_game.add_player2(opp_sid)
-    player2_json = new_game.get_board_json(opp_sid, ["Swap pieces then click the button to ready up"])
-    sid_to_game[sid] = new_game
-    sid_to_game[opp_sid] = new_game
-    sio.emit('resetGui', room=sid)
-    sio.emit('resetGui', room=opp_sid)
-    sio.emit('boardUpdate', player1_json, room=sid)
-    sio.emit('boardUpdate', player2_json, room=opp_sid)
+  game = None if sid not in sid_to_game or isinstance(sid_to_game, BotGame) else sid_to_game[sid]
+  if game is not None:
+    count = game.add_rematch_vote(sid)
+    opp_sid = game.get_opponent_sid(sid)
+    sio.emit('rematchCount', count, room=sid)
+    sio.emit('rematchCount', count, room=opp_sid)
+    if count == 2:
+      new_game = PvPGame(sid)
+      player1_json = new_game.get_board_json(sid, ["Swap pieces then click the button to ready up"])
+      new_game.add_player2(opp_sid)
+      player2_json = new_game.get_board_json(opp_sid, ["Swap pieces then click the button to ready up"])
+      sid_to_game[sid] = new_game
+      sid_to_game[opp_sid] = new_game
+      sio.emit('resetGui', room=sid)
+      sio.emit('resetGui', room=opp_sid)
+      sio.emit('boardUpdate', player1_json, room=sid)
+      sio.emit('boardUpdate', player2_json, room=opp_sid)
 
 @sio.on('do_bot_move')
 def do_bot_move():
   sid = request.sid
-  game = sid_to_game[sid]
+  game = None if sid not in sid_to_game else sid_to_game[sid]
   if isinstance(game, BotGame) and not game.has_winner() and game.get_turn() == Constants.PLAYER_TWO_NAME:
     messages = game.do_bot_move()
     messages = [x.message for x in messages if x.recipient_sid == sid]
@@ -141,16 +141,21 @@ def do_bot_move():
 @sio.on('receive_chat')
 def receive_chat(msg):
   sid = request.sid
-  game = sid_to_game[sid]
-  opp_sid = game.get_opponent_sid(sid)
-  if opp_sid is not None:
-    sio.emit('receiveChat', msg, room=opp_sid)
+  game = None if sid not in sid_to_game else sid_to_game[sid]
+  if game is not None:
+    opp_sid = game.get_opponent_sid(sid)
+    if opp_sid is not None:
+      sio.emit('receiveChat', msg, room=opp_sid)
 
 @sio.on('disconnect')
 def disconnect():
   sid = request.sid
   if sid in sid_to_game:
     game = sid_to_game[sid]
+    if isinstance(game, PvPGame) and game.get_join_id() is not None:
+      del join_id_to_game[game.get_join_id()]
+      game.set_join_id(None)
+    
     opp_sid = game.get_opponent_sid(sid)
     if opp_sid is not None:
       sio.emit('receiveMessage', 'opponent disconnected', room=opp_sid)
@@ -179,13 +184,16 @@ def style():
 
 @app.route('/images/<filename>')
 def image(filename):
+  if not filename or filename[0] not in Constants.RANK_TO_NAME or filename[1:] != '.svg':
+    return Response(status=404)
+
   with open('front/images/{}'.format(escape(filename))) as f:
     return Response(response=f.read(), mimetype='image/svg+xml')
 
 @app.route('/join/<join_id>')
 def handle_join(join_id):
   if join_id not in join_id_to_game:
-    return Response(response='Error. Invalid or stale url', mimetype='text/html')
+    return Response(response='Error. Invalid or stale url', mimetype='text/html', status=404)
   else:
     with open('front/index.html') as f:
       return Response(response=f.read(), mimetype='text/html')
