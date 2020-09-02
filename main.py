@@ -159,27 +159,27 @@ def disconnect():
 
 @app.route('/')
 def index():
-  with open('../index.html') as f:
+  with open('front/index.html') as f:
     return Response(response=f.read(), mimetype='text/html')
 
 @app.route('/script.js')
 def script():
-  with open('../script.js') as f:
+  with open('front/script.js') as f:
     return Response(response=f.read(), mimetype='text/javascript')
 
 @app.route('/jquery-3.5.1.min.js')
 def jquery():
-  with open('../jquery-3.5.1.min.js') as f:
+  with open('front/jquery-3.5.1.min.js') as f:
     return Response(response=f.read(), mimetype='text/javascript')
 
 @app.route('/styles.css')
 def style():
-  with open('../styles.css') as f:
+  with open('front/styles.css') as f:
     return Response(response=f.read(), mimetype='text/css')
 
 @app.route('/images/<filename>')
 def image(filename):
-  with open('../images/{}'.format(escape(filename))) as f:
+  with open('front/images/{}'.format(escape(filename))) as f:
     return Response(response=f.read(), mimetype='image/svg+xml')
 
 @app.route('/join/<join_id>')
@@ -187,7 +187,7 @@ def handle_join(join_id):
   if join_id not in join_id_to_game:
     return Response(response='Error. Invalid or stale url', mimetype='text/html')
   else:
-    with open('../index.html') as f:
+    with open('front/index.html') as f:
       return Response(response=f.read(), mimetype='text/html')
 
 if __name__ == '__main__':
