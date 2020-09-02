@@ -36,7 +36,7 @@ function updateSquares() {
         if (obj.team === "Blue") {
           let width = $(".row" + row).filter(".col" + col).width();
           let height = $(".row" + row).filter(".col" + col).height();
-          let html = `<img src="/${obj.rank}.svg" width="${width}" height="${height}">`;
+          let html = `<img src="/images/${obj.rank}.svg" width="${width}" height="${height}">`;
           html += '<div class="rank-display">';
           if (obj.rank !== 'B' && obj.rank !== 'F') {
             html += obj.rank;
@@ -124,7 +124,7 @@ function initGame() {
   centerSquareText();
 }
 
-const socket = io("http://localhost:8080");
+const socket = io();
 
 socket.on("boardUpdate", function(data) {
   let obj = JSON.parse(data);
@@ -158,7 +158,7 @@ socket.on("gameOver", function() {
     $('#message-box').append(`<div class="message-item"><i>Click the button to play again</i></div>`);
     $('#message-box').scrollTop($('#message-box')[0].scrollHeight);
     $('#start-button').text('New game');
-    $('#start-button').off('click').click(newGame('BOT'));
+    $('#start-button').off('click').click(() => newGame('BOT'));
     $('#start-button').show();
   }
   else {

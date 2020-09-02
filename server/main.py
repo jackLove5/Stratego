@@ -1,47 +1,21 @@
-from aiohttp import web
+from flask import Flask, Response, request
+from flask_socketio import SocketIO
+from markupsafe import escape
 from abstract_game import *
 from bot_game import *
 from pvp_game import *
 import random, string
-import socketio
 
-sio = socketio.AsyncServer(async_mode='aiohttp')
-app = web.Application()
-sio.attach(app)
-
-async def index(request):
-  with open('../index.html') as f:
-    return web.Response(text=f.read(), content_type='text/html')
-
-async def jquery(request):
-  with open('../jquery-3.5.1.min.js') as f:
-    return web.Response(text=f.read(), content_type='text/javascript')
-
-async def js(request):
-  with open('../script.js') as f:
-    return web.Response(text=f.read(), content_type='text/javascript')
-
-async def style(request):
-  with open('../styles.css') as f:
-    return web.Response(text=f.read(), content_type='text/css')
-
-async def piece_img(request):
-  with open('../images/{}.svg'.format(request.match_info['name'])) as f:
-    return web.Response(text=f.read(), content_type='image/svg+xml')
-
-async def handle_join(request):
-  join_id = request.match_info['join_id']
-  if join_id not in join_id_to_game:
-    return web.Response(text='Error. Invalid or stale url', content_type='text/html')
-  else:
-    with open('../index.html') as f:
-      return web.Response(text=f.read(), content_type='text/html')
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'changeme'
+sio = SocketIO(app)
 
 sid_to_game = {}
 join_id_to_game = {}
 @sio.on('receive_move')
-async def make_move(sid, string):
+def make_move(string):
   global sid_to_game
+  sid = request.sid
 
   game = None if sid not in sid_to_game else sid_to_game[sid]
   if game is not None and not game.has_winner():
@@ -50,40 +24,44 @@ async def make_move(sid, string):
 
     player_messages = [x.message for x in all_messages if x.recipient_sid == sid] 
     player_json = game.get_board_json(sid, player_messages)
-    await sio.emit('boardUpdate', player_json, sid)
+    sio.emit('boardUpdate', player_json, room=sid)
     
     opponent_sid = game.get_opponent_sid(sid)
     if opponent_sid is not None:
       opponent_messages = [x.message for x in all_messages if x.recipient_sid != sid]
       opponent_json = game.get_board_json(opponent_sid, opponent_messages)
-      await sio.emit('boardUpdate', opponent_json, opponent_sid)
+      sio.emit('boardUpdate', opponent_json, room=opponent_sid)
 
     if game.has_winner():
-      await sio.emit('gameOver')
+      sio.emit('gameOver', room=sid)
+      if opponent_sid is not None:
+        sio.emit('gameOver', room=opponent_sid)
 
 @sio.on('receive_config')
-async def receive_config(sid, string):
+def receive_config(string):
+  sid = request.sid
   game = None if sid not in sid_to_game else sid_to_game[sid]
   if game is not None:
     all_messages = game.set_board_config(sid, string)
     all_messages = [m for m in all_messages if m.recipient_sid is not None]
     for m in all_messages:
-      await sio.emit('receiveMessage', m.message, m.recipient_sid)
+      sio.emit('receiveMessage', m.message, room=m.recipient_sid)
     if game.has_begun():
       json = game.get_board_json(sid, [])
-      await sio.emit('boardUpdate', json, sid)
+      sio.emit('boardUpdate', json, room=sid)
       opp_sid = game.get_opponent_sid(sid)
       if opp_sid is not None:
         json = game.get_board_json(opp_sid, [])
-        await sio.emit('boardUpdate', json, opp_sid)
+        sio.emit('boardUpdate', json, room=opp_sid)
 
 @sio.on('new_bot_game')
-async def init_bot_game(sid):
+def init_bot_game():
+  sid = request.sid
   global sid_to_game
   sid_to_game[sid] = BotGame(sid)
   json = sid_to_game[sid].get_board_json(sid, ["Swap pieces then click the button to start the game"])
 
-  await sio.emit('boardUpdate', json, sid)
+  sio.emit('boardUpdate', json, room=sid)
 
 def get_new_id():
   new_id = None
@@ -93,8 +71,9 @@ def get_new_id():
   return new_id
 
 @sio.on('new_pvp_game')
-async def init_pvp_game(sid):
+def init_pvp_game():
   global sid_to_game
+  sid = request.sid
 
   new_game = PvPGame(sid)
   sid_to_game[sid] = new_game
@@ -104,14 +83,15 @@ async def init_pvp_game(sid):
 
   join_url = '/join/' + join_id
   json = new_game.get_board_json(sid, ['Join url: ' + join_url, 'Swap pieces then click the button to ready up'])
-  await sio.emit('boardUpdate', json, sid)
+  sio.emit('boardUpdate', json, room=sid)
 
 @sio.on('join')
-async def join_pvp_game(sid, join_id):
+def join_pvp_game(join_id):
   global sid_to_game
+  sid = request.sid
 
   if join_id not in join_id_to_game:
-    await sio.emit('receiveMessage', 'Error. Invalid or stale url', sid)
+    sio.emit('receiveMessage', 'Error. Invalid or stale url', room=sid)
   else:
     game = join_id_to_game[join_id]
     del join_id_to_game[join_id]
@@ -119,18 +99,20 @@ async def join_pvp_game(sid, join_id):
     game.add_player2(sid)
     sid_to_game[sid] = game
     json = game.get_board_json(sid, ["Swap pieces then click the button to ready up"])
-    await sio.emit('boardUpdate', json, sid)
+    sio.emit('boardUpdate', json, room=sid)
 
     opp_sid = game.get_opponent_sid(sid)
-    await sio.emit('receiveMessage', 'Opponent connected', opp_sid)
+    sio.emit('receiveMessage', 'Opponent connected', room=opp_sid)
 
 @sio.on('rematch')
-async def process_rematch_vote(sid):
+def process_rematch_vote():
+  sid = request.sid
+
   game = sid_to_game[sid]
   count = game.add_rematch_vote(sid)
   opp_sid = game.get_opponent_sid(sid)
-  await sio.emit('rematchCount', count, sid)
-  await sio.emit('rematchCount', count, opp_sid)
+  sio.emit('rematchCount', count, room=sid)
+  sio.emit('rematchCount', count, room=opp_sid)
   if count == 2:
     new_game = PvPGame(sid)
     player1_json = new_game.get_board_json(sid, ["Swap pieces then click the button to ready up"])
@@ -138,46 +120,75 @@ async def process_rematch_vote(sid):
     player2_json = new_game.get_board_json(opp_sid, ["Swap pieces then click the button to ready up"])
     sid_to_game[sid] = new_game
     sid_to_game[opp_sid] = new_game
-    await sio.emit('resetGui', sid)
-    await sio.emit('resetGui', opp_sid)
-    await sio.emit('boardUpdate', player1_json, sid)
-    await sio.emit('boardUpdate', player2_json, opp_sid)
+    sio.emit('resetGui', room=sid)
+    sio.emit('resetGui', room=opp_sid)
+    sio.emit('boardUpdate', player1_json, room=sid)
+    sio.emit('boardUpdate', player2_json, room=opp_sid)
 
 @sio.on('do_bot_move')
-async def do_bot_move(sid):
+def do_bot_move():
+  sid = request.sid
   game = sid_to_game[sid]
   if isinstance(game, BotGame) and not game.has_winner() and game.get_turn() == Constants.PLAYER_TWO_NAME:
     messages = game.do_bot_move()
     messages = [x.message for x in messages if x.recipient_sid == sid]
     json = game.get_board_json(sid, messages)
-    await sio.emit('boardUpdate', json, sid)
+    sio.emit('boardUpdate', json, room=sid)
     
     if game.has_winner():
-      await sio.emit('gameOver')
+      sio.emit('gameOver', room=sid)
 
 @sio.on('receive_chat')
-async def receive_chat(sid, msg):
+def receive_chat(msg):
+  sid = request.sid
   game = sid_to_game[sid]
   opp_sid = game.get_opponent_sid(sid)
   if opp_sid is not None:
-    await sio.emit('receiveChat', msg, opp_sid)
+    sio.emit('receiveChat', msg, room=opp_sid)
 
 @sio.on('disconnect')
-async def disconnect(sid):
+def disconnect():
+  sid = request.sid
   if sid in sid_to_game:
     game = sid_to_game[sid]
     opp_sid = game.get_opponent_sid(sid)
     if opp_sid is not None:
-      await sio.emit('receiveMessage', 'opponent disconnected')
+      sio.emit('receiveMessage', 'opponent disconnected', room=opp_sid)
 
     del sid_to_game[sid]
- 
-app.router.add_get('/', index)
-app.router.add_get('/jquery-3.5.1.min.js', jquery)
-app.router.add_get('/script.js', js)
-app.router.add_get('/styles.css', style)
-app.router.add_get('/{name:[1-9]|S|F|B}.svg', piece_img)
-app.router.add_get('/join/{join_id}', handle_join)
+
+@app.route('/')
+def index():
+  with open('../index.html') as f:
+    return Response(response=f.read(), mimetype='text/html')
+
+@app.route('/script.js')
+def script():
+  with open('../script.js') as f:
+    return Response(response=f.read(), mimetype='text/javascript')
+
+@app.route('/jquery-3.5.1.min.js')
+def jquery():
+  with open('../jquery-3.5.1.min.js') as f:
+    return Response(response=f.read(), mimetype='text/javascript')
+
+@app.route('/styles.css')
+def style():
+  with open('../styles.css') as f:
+    return Response(response=f.read(), mimetype='text/css')
+
+@app.route('/images/<filename>')
+def image(filename):
+  with open('../images/{}'.format(escape(filename))) as f:
+    return Response(response=f.read(), mimetype='image/svg+xml')
+
+@app.route('/join/<join_id>')
+def handle_join(join_id):
+  if join_id not in join_id_to_game:
+    return Response(response='Error. Invalid or stale url', mimetype='text/html')
+  else:
+    with open('../index.html') as f:
+      return Response(response=f.read(), mimetype='text/html')
 
 if __name__ == '__main__':
-  web.run_app(app)
+  sio.run(app)
